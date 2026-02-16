@@ -61,12 +61,29 @@ class SamsungEditorV6_4:
         self.colors = {"bg": "#f0f2f5", "header": "#ffffff", "accent": "#0078D4", "danger": "#d13438"}
         self.root.configure(bg=self.colors["bg"])
         
+        # --- NEW: AUTO-ICON LOADER ---
+        self.load_custom_icon()
+
         self.records = []
         self.current_file = None
         self.sort_descending = False
         
         self.setup_ui()
         self.auto_detect_hardware()
+
+    def load_custom_icon(self):
+        """Checks for icon.ico or icon.png and loads it if present."""
+        try:
+            # Check for .ico first (Best for Windows)
+            if os.path.exists("icon.ico"):
+                self.root.iconbitmap("icon.ico")
+            # Check for .png second (Best for Linux/Mac or Fallback)
+            elif os.path.exists("icon.png"):
+                icon_img = tk.PhotoImage(file="icon.png")
+                self.root.iconphoto(True, icon_img)
+        except Exception as e:
+            # Fails silently back to feather icon if file is corrupt
+            print(f"Icon load failed: {e}")
 
     def setup_ui(self):
         # 1. Top Menu
