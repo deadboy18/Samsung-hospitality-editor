@@ -23,9 +23,11 @@ class ChannelRecord:
     def parse(self):
         self.ch_num = struct.unpack("<H", self.raw_data[0:2])[0]
         try:
+            # Try decoding as UTF-16LE first (Standard for newer models)
             raw_name = self.raw_data[65:165]
             self.name = raw_name.decode("utf-16le").split('\x00')[0]
         except:
+            # Fallback for older models if necessary (rare)
             self.name = ""
         
         if self.ch_num != 0 and self.ch_num != 0xFFFF and len(self.name) > 0:
@@ -39,6 +41,7 @@ class ChannelRecord:
         if len(name_bytes) > 100: name_bytes = name_bytes[:100]
         padding = 100 - len(name_bytes)
         self.raw_data[65:165] = name_bytes + (b'\x00' * padding)
+        # Checksum calculation (Simple Modulo 256)
         self.raw_data[319] = sum(self.raw_data[0:319]) % 256
 
     def delete(self):
@@ -49,10 +52,10 @@ class ChannelRecord:
         self.raw_data[65:165] = b'\x00' * 100
 
 # --- MAIN APP ---
-class SamsungEditorV6_3:
+class SamsungEditorV6_4:
     def __init__(self, root):
         self.root = root
-        self.root.title("Samsung Hospitality Editor v6.3")
+        self.root.title("Samsung Hospitality Editor v6.4 (Universal)")
         self.root.geometry("1100x700")
         
         self.colors = {"bg": "#f0f2f5", "header": "#ffffff", "accent": "#0078D4", "danger": "#d13438"}
@@ -66,18 +69,17 @@ class SamsungEditorV6_3:
         self.auto_detect_hardware()
 
     def setup_ui(self):
-        # 1. Top Menu Bar
+        # 1. Top Menu
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
         
-        # Help Menu
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="How to Clone (USB)", command=self.show_clone_help) # NEW
+        help_menu.add_command(label="How to Clone (USB)", command=self.show_clone_help)
         help_menu.add_separator()
         help_menu.add_command(label="Map Types Explained", command=self.show_map_help)
         help_menu.add_separator()
-        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Samsung Hospitality Editor\nVersion 6.3\n\nDesigned for Hotel TV Reverse Engineering"))
+        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Samsung Hospitality Editor\nVersion 6.4\n\nSupports T-NT14L, T-MST9, and legacy FW."))
 
         # 2. Header
         header = tk.Frame(self.root, bg=self.colors["header"], height=100, padx=20, pady=15)
@@ -94,7 +96,7 @@ class SamsungEditorV6_3:
         tk.Button(toolbar, text="📂 Open Map", command=self.load_map, bg="white", relief="groove", padx=10).pack(side=tk.LEFT, padx=5)
         tk.Button(toolbar, text="💾 Save Map", command=self.save_map, bg=self.colors["accent"], fg="white", relief="flat", padx=15).pack(side=tk.LEFT, padx=5)
         
-        tk.Frame(toolbar, width=20, bg=self.colors["bg"]).pack(side=tk.LEFT) # Spacer
+        tk.Frame(toolbar, width=20, bg=self.colors["bg"]).pack(side=tk.LEFT)
         tk.Button(toolbar, text="📤 Export CSV", command=self.export_csv, bg="#e1e1e1", padx=10).pack(side=tk.LEFT, padx=5)
         tk.Button(toolbar, text="📥 Import CSV", command=self.import_csv, bg="#e1e1e1", padx=10).pack(side=tk.LEFT, padx=5)
 
@@ -130,8 +132,7 @@ class SamsungEditorV6_3:
         self.ctx_menu.add_separator()
         self.ctx_menu.add_command(label="❌ Delete Selected", command=self.delete_channel)
 
-        # 5. Status Bar
-        self.status_var = tk.StringVar(value="Ready. Recommended: Open 'map-AirD' for Digital Channels.")
+        self.status_var = tk.StringVar(value="Ready. Open a 'map-AirD' (Digital) or 'map-CableA' (Analog) file.")
         tk.Label(self.root, textvariable=self.status_var, bg="#e1e1e1", anchor="w", padx=10).pack(fill=tk.X, side=tk.BOTTOM)
 
     def show_clone_help(self):
@@ -156,14 +157,12 @@ class SamsungEditorV6_3:
         info = (
             "WHICH FILE SHOULD I EDIT?\n\n"
             "► map-AirD (Recommended)\n"
-            "   • Contains DIGITAL Terrestrial channels.\n"
-            "   • High quality, supports Names & EPG.\n"
-            "   • Most common for modern hotels.\n\n"
-            "► map-AirA\n"
-            "   • Contains ANALOG Terrestrial channels.\n"
-            "   • Only used for legacy systems.\n\n"
-            "► map-CableD / map-CableA\n"
-            "   • Same as above, but for CABLE signals."
+            "   • DIGITAL Terrestrial channels.\n"
+            "   • Use this for modern HD channels.\n\n"
+            "► map-AirA / map-CableA\n"
+            "   • ANALOG / CABLE channels.\n"
+            "   • Use this if your TV scans Analog signals.\n\n"
+            "NOTE: If your clone is missing map-AirD, your TV might be in Analog mode."
         )
         messagebox.showinfo("Map Types Explained", info)
 
@@ -173,6 +172,7 @@ class SamsungEditorV6_3:
         panel_str = "Unknown"
         tech_details = ""
 
+        # 1. ProductCloneInfo (Standard Method)
         if os.path.exists("ProductCloneInfo"):
             try:
                 with open("ProductCloneInfo", "rb") as f:
@@ -183,21 +183,38 @@ class SamsungEditorV6_3:
                         model = raw.split('#')[1].split('%')[0]
             except: pass
         
+        # 2. FADAT (Universal / Fallback Method)
         if os.path.exists("FADAT"):
             try:
                 with open("FADAT", "rb") as f:
                     data = f.read()
-                    full = "".join([chr(b) if 32 <= b <= 126 else "|" for b in data])
-                    parts = [p for p in full.split('|') if len(p) > 3]
-                    for p in parts:
-                        if re.match(r'^\d{2}[A-Z]\d', p):
-                            panel_str = p
-                            break
-                    if panel_str != "Unknown":
+                    # Treat the whole file as one big string to find patterns
+                    # Replace nulls/unprintables with spaces to handle both formats
+                    full_text = "".join([chr(b) if 32 <= b <= 126 else " " for b in data])
+                    
+                    # A. Hunt for Firmware (Starts with T-)
+                    # Looks for T- followed by letters/numbers, at least 5 chars long
+                    fw_match = re.search(r'(T-[A-Z0-9]+)', full_text)
+                    if fw_match and fw == "Unknown":
+                        fw = fw_match.group(1)
+                        
+                    # B. Hunt for Panel Code (e.g., 40A6AF1D)
+                    # Pattern: 2 digits + Letter + Digit
+                    panel_match = re.search(r'\b(\d{2}[A-Z]\d[A-Z0-9]*)\b', full_text)
+                    if panel_match:
+                        panel_str = panel_match.group(1)
+                        # Decode Panel Info
                         size = panel_str[:2]
                         series = panel_str[2:4]
                         rev = panel_str[4:]
                         tech_details = f"Display: {size}\" ({series} Series)\nRev: {rev}"
+
+                    # C. Hunt for Model Code (e.g., HA570) if we still don't know it
+                    if model == "Unknown":
+                        # Look for common Samsung Hospitality prefixes like HA, HB, HC
+                        model_match = re.search(r'\b(H[A-Z]\d{3})\b', full_text)
+                        if model_match:
+                            model = model_match.group(1)
             except: pass
             
         display_text = f"MODEL: {model}\nFW: {fw}\nPANEL CODE: {panel_str}\n{tech_details}"
@@ -369,5 +386,5 @@ class SamsungEditorV6_3:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = SamsungEditorV6_3(root)
+    app = SamsungEditorV6_4(root)
     root.mainloop()
