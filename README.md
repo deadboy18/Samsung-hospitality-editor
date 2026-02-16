@@ -1,3 +1,5 @@
+<img width="1536" height="1024" alt="SamsungEditorLogo" src="https://github.com/user-attachments/assets/342f9428-fb6c-40d6-81f1-3341759cf45a" />
+
 # Samsung Hospitality TV Channel Editor
 
 A powerful, open-source tool to reverse engineer and manage channel lists for Samsung Hospitality TVs. This tool allows IT managers and administrators to sort, rename, and bulk-edit channel maps via CSV, bypassing the tedious on-screen menu editing process.
