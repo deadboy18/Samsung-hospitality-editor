@@ -39,6 +39,18 @@ This tool has been verified to work on the following Samsung Hospitality models:
 * [Official Support Page](https://www.samsung.com/au/support/model/HG32AC470GWXXY/)
 
 
+3. **Samsung HG32AE690DK** (HG32A Series)
+* [Official Support Page](https://www.samsung.com/levant/support/model/HG32AE690DKXZN/)
+
+I believe it will work for these models all below
+Model	Screen Size (inch)
+HG32AC470 Samsung	32
+HG40AC460 Samsung	40
+HG55AC690 Samsung	55
+UA40H5008 Samsung	40
+HG32AB670 Samsung	32
+HG32AE690DK Samsung	32
+HG40AA570 Samsung	40
 
 *Note: It likely works on most Samsung TVs that use the `T-NT14L` or similar firmware structure (Clone.dat file system).*
 
