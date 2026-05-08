@@ -4,11 +4,11 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Samsung Hospitality TV Channel Editor</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.10/babel.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;600&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -18,10 +18,12 @@
   --accent:#3b82f6;--accent2:#2563eb;--accent3:#1d4ed8;
   --danger:#ef4444;--danger-bg:#7f1d1d;--danger-light:#f87171;--danger-bg2:#3d1519;
   --success:#22c55e;--success-light:#4ade80;--success-bg:#0d3320;
+  --warn:#f59e0b;--warn-light:#fbbf24;--warn-bg:#451a03;
   --info-bg:#1a2332;--info-light:#60a5fa;
   --btn-bg:#1e293b;--btn-border:#2d3748;
-  --scroll-track:#0a0e17;--scroll-thumb:#1e293b;--scroll-hover:#334155;
+  --scroll-track:#0a0e17;--scroll-thumb:#1e293b;
   --select-bg:rgba(59,130,246,0.08);--hover-bg:#0d1420;
+  --modal-bg:rgba(0,0,0,0.6);--modal-card:#111827;
   --font:'IBM Plex Mono','Fira Code','SF Mono',monospace;
 }
 [data-theme="light"]{
@@ -31,313 +33,190 @@
   --accent:#2563eb;--accent2:#1d4ed8;--accent3:#1e40af;
   --danger:#dc2626;--danger-bg:#fef2f2;--danger-light:#dc2626;--danger-bg2:#fef2f2;
   --success:#16a34a;--success-light:#16a34a;--success-bg:#f0fdf4;
+  --warn:#d97706;--warn-light:#d97706;--warn-bg:#fffbeb;
   --info-bg:#eff6ff;--info-light:#2563eb;
   --btn-bg:#e5e7eb;--btn-border:#d1d5db;
-  --scroll-track:#f4f6f9;--scroll-thumb:#d1d5db;--scroll-hover:#9ca3af;
+  --scroll-track:#f4f6f9;--scroll-thumb:#d1d5db;
   --select-bg:rgba(37,99,235,0.06);--hover-bg:#f0f2f5;
+  --modal-bg:rgba(0,0,0,0.3);--modal-card:#ffffff;
 }
 html,body{height:100%;overflow:auto}
 body{background:var(--bg);color:var(--text);font-family:var(--font);transition:background .25s,color .25s}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--scroll-track)}
 ::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:var(--scroll-hover)}
 input[type="checkbox"]{cursor:pointer;accent-color:var(--accent)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-[dir="rtl"] .toolbar-row{flex-direction:row-reverse}
-[dir="rtl"] .hw-info{text-align:left}
+@keyframes modalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useRef,useCallback,useMemo,useEffect,createContext,useContext}=React;
+const {useState,useRef,useCallback,useMemo,useEffect}=React;
 
-/* ============================================================
-   TRANSLATIONS
-   ============================================================ */
-const LANGS={
-  en:{
-    code:"en",dir:"ltr",label:"English",
-    title:"Samsung",titleAccent:"Channel Editor",
-    subtitle:"WEB EDITION — v6.4 — ALL PROCESSING RUNS LOCALLY IN YOUR BROWSER",
-    dropTitle:"Drop your {file} file here",
-    dropSub:"or click to browse — also accepts map-AirA, map-CableA",
-    loadAux:"+ Load ProductCloneInfo / FADAT",
-    howTitle:"HOW IT WORKS",
-    how1:'1. Clone TV to USB via Hotel Menu (Mute → 1 → 1 → 9 → Enter)',
-    how2:'2. Upload your {file} file here',
-    how3:'3. Edit channels, export/import CSV for bulk edits',
-    how4:'4. Download the modified file and flash it back to the TV',
-    openMap:"Open Map",saveDownload:"Save & Download",
-    exportCsv:"Export CSV",importCsv:"Import CSV",
-    deleteN:"Delete {n}",search:"Search channels...",
-    chActive:"{n} CH active",chsActive:"{n} CHs active",
-    colCh:"CH #",colName:"Channel Name",colActions:"Actions",
-    noMatch:"No channels match your search.",
-    noActive:"No active channels found in this file.",
-    footer:"Samsung Hospitality Editor — Web Edition — All processing runs locally, no data leaves your browser",
-    toastLoaded:"Loaded {n} active channels from {f}",
-    toastSaved:"Map downloaded! Flash it back to the TV via USB.",
-    toastCsvOut:"CSV exported — edit in Excel, then import back.",
-    toastCsvBad:"Invalid CSV — missing 'Index (DO NOT EDIT)' column.",
-    toastCsvIn:"Updated {n} channels from CSV.",
-    toastUpdated:"Channel updated.",
-    toastDeleted:"Channel deleted.",
-    toastDeletedN:"Deleted {n} channel(s).",
-    toastLoadFirst:"Load a map file first!",
-    toastNumError:"Channel number must be an integer.",
-    model:"MODEL",fw:"FW",panel:"PANEL",
-    theme:"Theme",lang:"Language"
+/* ═══════════════════ TRANSLATIONS ═══════════════════ */
+const L_DATA={
+  en:{dir:"ltr",label:"English",title:"Samsung",ta:"Channel Editor",sub:"WEB EDITION — v6.4 — ALL PROCESSING RUNS LOCALLY IN YOUR BROWSER",
+    drop:"Drop your {0} file here",dropSub:"or click to browse — supports map-AirD, map-AirA, map-CableA",dropFolder:"Or drop your entire Clone folder to auto-detect everything",
+    loadAux:"+ Load ProductCloneInfo / FADAT",howT:"HOW IT WORKS",h1:"1. Clone TV to USB via Hotel Menu (Mute → 1 → 1 → 9 → Enter)",h2:"2. Upload your {0} file here",h3:"3. Edit channels, export/import CSV for bulk edits",h4:"4. Download the modified file and flash it back to the TV",
+    open:"Open Map",save:"Save & Download",backup:"Backup Original",expCsv:"Export CSV",impCsv:"Import CSV",
+    delN:"Delete ({0})",search:"Search channels...",chAct:"{0} CHs active",
+    cCh:"CH #",cNm:"Channel Name",cAct:"Actions",noM:"No channels match your search.",noA:"No active channels found.",
+    foot:"Samsung Hospitality Editor — Web Edition — All processing runs locally",
+    tLoad:"Loaded {0} active channels from {1}",tSave:"Map downloaded! Flash it back via USB.",tBak:"Backup of original downloaded.",
+    tCsvO:"CSV exported — edit in Excel, then import back.",tCsvB:"Invalid CSV — missing 'Index (DO NOT EDIT)' column.",tCsvI:"Updated {0} channels from CSV.",
+    tUpd:"Channel updated.",tDel:"Channel deleted.",tDelN:"Deleted {0} channel(s).",tFirst:"Load a map file first!",tNum:"Channel number must be an integer.",tDup:"Warning: CH {0} is a duplicate number.",tFolder:"Auto-detected files from Clone folder.",
+    mod:"MODEL",fw:"FW",pan:"PANEL CODE",disp:"DISPLAY",ser:"SERIES",rev:"REV",
+    helpM:"Help",hcT:"How to Clone (USB)",hmT:"Map Types Explained",haT:"About",
+    hcB:"HOW TO EXTRACT (CLONE) FILES:\n\n1. Turn TV ON.\n2. Insert USB Drive.\n3. Enter Hotel Menu: [MUTE] > [1] > [1] > [9] > [ENTER].\n4. Select 'Clone TV to USB' and press Enter.\n5. Wait for success message, then remove USB.\n\n──────────────────────────────\n\nHOW TO LOAD FILES TO TV:\n\n1. Turn TV ON.\n2. Insert USB Drive (with modified files).\n3. Enter Hotel Menu: [MUTE] > [1] > [1] > [9] > [ENTER].\n4. Select 'Clone USB to TV' and press Enter.\n5. The TV may reboot to apply settings.",
+    hmB:"WHICH FILE SHOULD I EDIT?\n\n► map-AirD (Recommended)\n   • DIGITAL Terrestrial channels.\n   • Use this for modern HD channels.\n\n► map-AirA / map-CableA\n   • ANALOG / CABLE channels.\n   • Use this if your TV scans Analog signals.\n\nNOTE: If your clone is missing map-AirD,\nyour TV might be in Analog mode.",
+    haB:"Samsung Hospitality Editor\nVersion 6.4 (Web Edition)\n\nSupports T-NT14L, T-MST9, and legacy FW.\n\nOriginal Python tool by deadboy18\ngithub.com/deadboy18/Samsung-hospitality-editor",
+    edT:"Edit Channel",edN:"Channel Number",edNm:"Channel Name",edS:"Save",edC:"Cancel",
+    cdT:"Confirm Delete",cdB:"Are you sure you want to delete {0} channel(s)?",cdY:"Yes, Delete",cdN:"Cancel",
+    ciT:"CSV Export Info",ciB:"IMPORTANT:\n\nYou can edit 'Channel Number' and 'Channel Name' in Excel.\n\nDO NOT edit the 'Index' column.\nThis ID is required to link data back to the original file.",ciO:"Got it, Export",
+    ctE:"Edit Channel",ctD:"Delete Selected",
+    sReady:"Ready. Open a 'map-AirD' (Digital) or 'map-CableA' (Analog) file.",sLoad:"Loaded {0} records from {1}. {2} active channels.",sEdit:"Unsaved changes."
   },
-  ms:{
-    code:"ms",dir:"ltr",label:"Bahasa Melayu",
-    title:"Samsung",titleAccent:"Editor Saluran",
-    subtitle:"EDISI WEB — v6.4 — SEMUA PEMPROSESAN BERJALAN SECARA TEMPATAN",
-    dropTitle:"Lepaskan fail {file} anda di sini",
-    dropSub:"atau klik untuk semak imbas — juga menerima map-AirA, map-CableA",
-    loadAux:"+ Muat ProductCloneInfo / FADAT",
-    howTitle:"CARA PENGGUNAAN",
-    how1:'1. Klon TV ke USB melalui Menu Hotel (Mute → 1 → 1 → 9 → Enter)',
-    how2:'2. Muat naik fail {file} anda di sini',
-    how3:'3. Edit saluran, eksport/import CSV untuk suntingan pukal',
-    how4:'4. Muat turun fail yang diubah dan masukkan semula ke TV',
-    openMap:"Buka Map",saveDownload:"Simpan & Muat Turun",
-    exportCsv:"Eksport CSV",importCsv:"Import CSV",
-    deleteN:"Padam {n}",search:"Cari saluran...",
-    chActive:"{n} saluran aktif",chsActive:"{n} saluran aktif",
-    colCh:"CH #",colName:"Nama Saluran",colActions:"Tindakan",
-    noMatch:"Tiada saluran sepadan.",
-    noActive:"Tiada saluran aktif ditemui.",
-    footer:"Samsung Hospitality Editor — Edisi Web — Semua data diproses secara tempatan",
-    toastLoaded:"Dimuatkan {n} saluran aktif dari {f}",
-    toastSaved:"Map dimuat turun! Masukkan semula ke TV melalui USB.",
-    toastCsvOut:"CSV dieksport — edit dalam Excel, kemudian import semula.",
-    toastCsvBad:"CSV tidak sah — lajur 'Index (DO NOT EDIT)' tiada.",
-    toastCsvIn:"Dikemaskini {n} saluran dari CSV.",
-    toastUpdated:"Saluran dikemaskini.",
-    toastDeleted:"Saluran dipadam.",
-    toastDeletedN:"{n} saluran dipadam.",
-    toastLoadFirst:"Muat fail map terlebih dahulu!",
-    toastNumError:"Nombor saluran mestilah integer.",
-    model:"MODEL",fw:"FW",panel:"PANEL",
-    theme:"Tema",lang:"Bahasa"
+  ms:{dir:"ltr",label:"Bahasa Melayu",title:"Samsung",ta:"Editor Saluran",sub:"EDISI WEB — v6.4 — SEMUA PEMPROSESAN BERJALAN SECARA TEMPATAN",
+    drop:"Lepaskan fail {0} di sini",dropSub:"atau klik untuk semak imbas — menyokong map-AirD, map-AirA, map-CableA",dropFolder:"Atau lepaskan folder Clone untuk auto-detect",
+    loadAux:"+ Muat ProductCloneInfo / FADAT",howT:"CARA PENGGUNAAN",h1:"1. Klon TV ke USB (Mute → 1 → 1 → 9 → Enter)",h2:"2. Muat naik fail {0} di sini",h3:"3. Edit saluran, eksport/import CSV",h4:"4. Muat turun & masukkan semula ke TV",
+    open:"Buka Map",save:"Simpan & Muat Turun",backup:"Muat Turun Asal",expCsv:"Eksport CSV",impCsv:"Import CSV",
+    delN:"Padam ({0})",search:"Cari saluran...",chAct:"{0} saluran aktif",
+    cCh:"CH #",cNm:"Nama Saluran",cAct:"Tindakan",noM:"Tiada saluran sepadan.",noA:"Tiada saluran aktif.",
+    foot:"Samsung Hospitality Editor — Edisi Web — Data diproses secara tempatan",
+    tLoad:"Dimuatkan {0} saluran aktif dari {1}",tSave:"Map dimuat turun! Masukkan semula ke TV.",tBak:"Backup fail asal dimuat turun.",
+    tCsvO:"CSV dieksport — edit dalam Excel.",tCsvB:"CSV tidak sah.",tCsvI:"Dikemaskini {0} saluran dari CSV.",
+    tUpd:"Saluran dikemaskini.",tDel:"Saluran dipadam.",tDelN:"{0} saluran dipadam.",tFirst:"Muat fail map dahulu!",tNum:"Nombor mestilah integer.",tDup:"Amaran: CH {0} nombor pendua.",tFolder:"Auto-detect fail dari folder Clone.",
+    mod:"MODEL",fw:"FW",pan:"KOD PANEL",disp:"PAPARAN",ser:"SIRI",rev:"REV",
+    helpM:"Bantuan",hcT:"Cara Klon (USB)",hmT:"Jenis Map",haT:"Tentang",
+    hcB:"CARA KLON FAIL:\n\n1. Hidupkan TV.\n2. Masukkan USB.\n3. Menu Hotel: [MUTE] > [1] > [1] > [9] > [ENTER].\n4. Pilih 'Clone TV to USB'.\n5. Tunggu mesej berjaya.\n\n──────────────────────────────\n\nCARA MUAT KE TV:\n\n1. Hidupkan TV.\n2. Masukkan USB.\n3. Menu Hotel.\n4. 'Clone USB to TV'.\n5. TV mungkin restart.",
+    hmB:"FAIL MANA PERLU DIEDIT?\n\n► map-AirD (Disyorkan)\n   • Saluran Digital.\n\n► map-AirA / map-CableA\n   • Saluran Analog / Kabel.\n\nNOTA: Jika tiada map-AirD, TV mungkin dalam mod Analog.",
+    haB:"Samsung Hospitality Editor\nVersi 6.4 (Web)\n\nMenyokong T-NT14L, T-MST9.\n\nAlat asal oleh deadboy18",
+    edT:"Edit Saluran",edN:"Nombor Saluran",edNm:"Nama Saluran",edS:"Simpan",edC:"Batal",
+    cdT:"Sahkan Padam",cdB:"Pasti mahu memadam {0} saluran?",cdY:"Ya, Padam",cdN:"Batal",
+    ciT:"Info Eksport CSV",ciB:"PENTING:\n\nAnda boleh edit 'Channel Number' dan 'Channel Name' dalam Excel.\n\nJANGAN edit lajur 'Index'.",ciO:"Faham, Eksport",
+    ctE:"Edit Saluran",ctD:"Padam Yang Dipilih",
+    sReady:"Sedia. Buka fail 'map-AirD' atau 'map-CableA'.",sLoad:"Dimuatkan {0} rekod dari {1}. {2} saluran aktif.",sEdit:"Perubahan belum disimpan."
   },
-  zh:{
-    code:"zh",dir:"ltr",label:"中文",
-    title:"三星",titleAccent:"频道编辑器",
-    subtitle:"网页版 — v6.4 — 所有处理均在本地浏览器中完成",
-    dropTitle:"将 {file} 文件拖放到此处",
-    dropSub:"或点击浏览 — 也支持 map-AirA、map-CableA",
-    loadAux:"+ 加载 ProductCloneInfo / FADAT",
-    howTitle:"使用方法",
-    how1:'1. 通过酒店菜单将电视克隆到USB (静音 → 1 → 1 → 9 → 确认)',
-    how2:'2. 在此上传您的 {file} 文件',
-    how3:'3. 编辑频道，导出/导入CSV进行批量编辑',
-    how4:'4. 下载修改后的文件并刷回电视',
-    openMap:"打开Map",saveDownload:"保存并下载",
-    exportCsv:"导出CSV",importCsv:"导入CSV",
-    deleteN:"删除 {n}",search:"搜索频道...",
-    chActive:"{n} 个频道",chsActive:"{n} 个频道",
-    colCh:"频道号",colName:"频道名称",colActions:"操作",
-    noMatch:"没有匹配的频道。",
-    noActive:"未找到活跃频道。",
-    footer:"三星酒店电视频道编辑器 — 网页版 — 数据不离开您的浏览器",
-    toastLoaded:"从 {f} 加载了 {n} 个活跃频道",
-    toastSaved:"Map已下载！通过USB刷回电视。",
-    toastCsvOut:"CSV已导出 — 在Excel中编辑后重新导入。",
-    toastCsvBad:"无效CSV — 缺少 'Index (DO NOT EDIT)' 列。",
-    toastCsvIn:"从CSV更新了 {n} 个频道。",
-    toastUpdated:"频道已更新。",
-    toastDeleted:"频道已删除。",
-    toastDeletedN:"已删除 {n} 个频道。",
-    toastLoadFirst:"请先加载map文件！",
-    toastNumError:"频道号必须为整数。",
-    model:"型号",fw:"固件",panel:"面板",
-    theme:"主题",lang:"语言"
+  zh:{dir:"ltr",label:"中文",title:"三星",ta:"频道编辑器",sub:"网页版 — v6.4 — 本地浏览器处理",
+    drop:"将 {0} 文件拖放到此处",dropSub:"或点击浏览 — 支持 map-AirD、map-AirA、map-CableA",dropFolder:"或拖放整个 Clone 文件夹",
+    loadAux:"+ 加载 ProductCloneInfo / FADAT",howT:"使用方法",h1:"1. 酒店菜单克隆到USB (静音→1→1→9→确认)",h2:"2. 上传 {0} 文件",h3:"3. 编辑频道，CSV批量编辑",h4:"4. 下载修改文件并刷回电视",
+    open:"打开Map",save:"保存并下载",backup:"下载备份",expCsv:"导出CSV",impCsv:"导入CSV",
+    delN:"删除 ({0})",search:"搜索频道...",chAct:"{0} 个频道",
+    cCh:"频道号",cNm:"频道名称",cAct:"操作",noM:"没有匹配频道。",noA:"未找到活跃频道。",
+    foot:"三星酒店频道编辑器 — 网页版",
+    tLoad:"从 {1} 加载了 {0} 个频道",tSave:"已下载！通过USB刷回电视。",tBak:"原始备份已下载。",
+    tCsvO:"CSV已导出。",tCsvB:"无效CSV。",tCsvI:"更新了 {0} 个频道。",
+    tUpd:"频道已更新。",tDel:"频道已删除。",tDelN:"已删除 {0} 个频道。",tFirst:"请先加载map文件！",tNum:"必须为整数。",tDup:"警告：CH {0} 号码重复。",tFolder:"从Clone文件夹自动检测。",
+    mod:"型号",fw:"固件",pan:"面板代码",disp:"显示",ser:"系列",rev:"版本",
+    helpM:"帮助",hcT:"如何克隆(USB)",hmT:"Map类型",haT:"关于",
+    hcB:"克隆方法：\n\n1. 开电视\n2. 插USB\n3. 酒店菜单: [静音]>[1]>[1]>[9]>[确认]\n4. 选 'Clone TV to USB'\n5. 等成功\n\n──────────────────────────────\n\n刷回方法：\n\n1. 开电视\n2. 插USB\n3. 酒店菜单\n4. 'Clone USB to TV'\n5. 电视可能重启",
+    hmB:"编辑哪个文件？\n\n► map-AirD（推荐）\n   • 数字地面频道\n\n► map-AirA / map-CableA\n   • 模拟/有线频道",
+    haB:"三星酒店频道编辑器\n版本 6.4 (网页版)\n\n支持 T-NT14L、T-MST9\n\n原工具 deadboy18",
+    edT:"编辑频道",edN:"频道号",edNm:"频道名称",edS:"保存",edC:"取消",
+    cdT:"确认删除",cdB:"确定删除 {0} 个频道？",cdY:"是",cdN:"取消",
+    ciT:"CSV导出信息",ciB:"重要：可编辑 Channel Number 和 Channel Name。\n\n请勿编辑 Index 列。",ciO:"明白，导出",
+    ctE:"编辑频道",ctD:"删除选中",sReady:"就绪。",sLoad:"从 {1} 加载 {0} 条。{2} 个活跃。",sEdit:"有未保存更改。"
   },
-  ar:{
-    code:"ar",dir:"rtl",label:"العربية",
-    title:"سامسونج",titleAccent:"محرر القنوات",
-    subtitle:"إصدار الويب — v6.4 — تتم جميع العمليات محلياً في متصفحك",
-    dropTitle:"أسقط ملف {file} هنا",
-    dropSub:"أو انقر للتصفح — يقبل أيضاً map-AirA و map-CableA",
-    loadAux:"+ تحميل ProductCloneInfo / FADAT",
-    howTitle:"طريقة الاستخدام",
-    how1:'١. استنساخ التلفزيون إلى USB عبر قائمة الفندق (كتم → ١ → ١ → ٩ → إدخال)',
-    how2:'٢. ارفع ملف {file} هنا',
-    how3:'٣. حرر القنوات، صدّر/استورد CSV للتحرير الجماعي',
-    how4:'٤. حمّل الملف المعدّل وأعده إلى التلفزيون',
-    openMap:"فتح Map",saveDownload:"حفظ وتنزيل",
-    exportCsv:"تصدير CSV",importCsv:"استيراد CSV",
-    deleteN:"حذف {n}",search:"بحث في القنوات...",
-    chActive:"{n} قناة نشطة",chsActive:"{n} قنوات نشطة",
-    colCh:"رقم",colName:"اسم القناة",colActions:"إجراءات",
-    noMatch:"لا توجد قنوات مطابقة.",
-    noActive:"لم يتم العثور على قنوات نشطة.",
-    footer:"محرر قنوات سامسونج للضيافة — إصدار الويب — لا تغادر بياناتك المتصفح",
-    toastLoaded:"تم تحميل {n} قناة نشطة من {f}",
-    toastSaved:"تم تنزيل الملف! أعده إلى التلفزيون عبر USB.",
-    toastCsvOut:"تم تصدير CSV — حرره في Excel ثم أعد استيراده.",
-    toastCsvBad:"ملف CSV غير صالح — عمود 'Index (DO NOT EDIT)' مفقود.",
-    toastCsvIn:"تم تحديث {n} قناة من CSV.",
-    toastUpdated:"تم تحديث القناة.",
-    toastDeleted:"تم حذف القناة.",
-    toastDeletedN:"تم حذف {n} قناة.",
-    toastLoadFirst:"يرجى تحميل ملف map أولاً!",
-    toastNumError:"رقم القناة يجب أن يكون عدداً صحيحاً.",
-    model:"الطراز",fw:"البرنامج",panel:"اللوحة",
-    theme:"السمة",lang:"اللغة"
+  ar:{dir:"rtl",label:"العربية",title:"سامسونج",ta:"محرر القنوات",sub:"إصدار الويب — v6.4 — معالجة محلية",
+    drop:"أسقط ملف {0} هنا",dropSub:"أو انقر للتصفح",dropFolder:"أو أسقط مجلد Clone بالكامل",
+    loadAux:"+ تحميل ProductCloneInfo / FADAT",howT:"طريقة الاستخدام",h1:"١. استنساخ إلى USB (كتم→١→١→٩→إدخال)",h2:"٢. ارفع ملف {0}",h3:"٣. حرر القنوات، CSV للتحرير الجماعي",h4:"٤. حمّل الملف المعدّل",
+    open:"فتح Map",save:"حفظ وتنزيل",backup:"تنزيل أصلي",expCsv:"تصدير CSV",impCsv:"استيراد CSV",
+    delN:"حذف ({0})",search:"بحث...",chAct:"{0} قنوات نشطة",
+    cCh:"رقم",cNm:"اسم القناة",cAct:"إجراءات",noM:"لا توجد نتائج.",noA:"لا قنوات نشطة.",
+    foot:"محرر سامسونج — ويب",
+    tLoad:"تم تحميل {0} قناة من {1}",tSave:"تم التنزيل!",tBak:"تم تنزيل النسخة الاحتياطية.",
+    tCsvO:"تم تصدير CSV.",tCsvB:"CSV غير صالح.",tCsvI:"تم تحديث {0} قناة.",
+    tUpd:"تم التحديث.",tDel:"تم الحذف.",tDelN:"تم حذف {0}.",tFirst:"حمّل ملف أولاً!",tNum:"يجب أن يكون عدداً.",tDup:"تحذير: CH {0} مكرر.",tFolder:"كشف تلقائي من Clone.",
+    mod:"الطراز",fw:"البرنامج",pan:"كود اللوحة",disp:"العرض",ser:"السلسلة",rev:"المراجعة",
+    helpM:"مساعدة",hcT:"طريقة الاستنساخ",hmT:"أنواع Map",haT:"حول",
+    hcB:"الاستخراج:\n١. شغّل التلفزيون\n٢. أدخل USB\n٣. قائمة الفندق\n٤. Clone TV to USB\n٥. انتظر\n\n──────────────────────────────\n\nالتحميل:\n١. شغّل التلفزيون\n٢. أدخل USB\n٣. قائمة الفندق\n٤. Clone USB to TV",
+    hmB:"► map-AirD (موصى)\n   قنوات رقمية\n\n► map-AirA / map-CableA\n   قنوات تناظرية",
+    haB:"محرر قنوات سامسونج\nالإصدار 6.4\n\nبواسطة deadboy18",
+    edT:"تحرير",edN:"رقم القناة",edNm:"اسم القناة",edS:"حفظ",edC:"إلغاء",
+    cdT:"تأكيد الحذف",cdB:"حذف {0} قناة؟",cdY:"نعم",cdN:"إلغاء",
+    ciT:"معلومات CSV",ciB:"لا تحرر عمود Index.",ciO:"فهمت",
+    ctE:"تحرير",ctD:"حذف",sReady:"جاهز.",sLoad:"تم تحميل {0} من {1}. {2} نشطة.",sEdit:"تغييرات غير محفوظة."
   },
-  es:{
-    code:"es",dir:"ltr",label:"Español",
-    title:"Samsung",titleAccent:"Editor de Canales",
-    subtitle:"EDICIÓN WEB — v6.4 — TODO EL PROCESAMIENTO ES LOCAL EN TU NAVEGADOR",
-    dropTitle:"Suelta tu archivo {file} aquí",
-    dropSub:"o haz clic para buscar — también acepta map-AirA, map-CableA",
-    loadAux:"+ Cargar ProductCloneInfo / FADAT",
-    howTitle:"CÓMO FUNCIONA",
-    how1:'1. Clonar TV a USB vía Menú Hotel (Mute → 1 → 1 → 9 → Enter)',
-    how2:'2. Sube tu archivo {file} aquí',
-    how3:'3. Edita canales, exporta/importa CSV para edición masiva',
-    how4:'4. Descarga el archivo modificado y flashéalo al TV',
-    openMap:"Abrir Mapa",saveDownload:"Guardar y Descargar",
-    exportCsv:"Exportar CSV",importCsv:"Importar CSV",
-    deleteN:"Eliminar {n}",search:"Buscar canales...",
-    chActive:"{n} canal activo",chsActive:"{n} canales activos",
-    colCh:"CH #",colName:"Nombre del Canal",colActions:"Acciones",
-    noMatch:"Ningún canal coincide con tu búsqueda.",
-    noActive:"No se encontraron canales activos.",
-    footer:"Samsung Hospitality Editor — Edición Web — Ningún dato sale de tu navegador",
-    toastLoaded:"Cargados {n} canales activos de {f}",
-    toastSaved:"¡Mapa descargado! Flashéalo al TV vía USB.",
-    toastCsvOut:"CSV exportado — edítalo en Excel, luego reimporta.",
-    toastCsvBad:"CSV inválido — falta columna 'Index (DO NOT EDIT)'.",
-    toastCsvIn:"{n} canales actualizados desde CSV.",
-    toastUpdated:"Canal actualizado.",
-    toastDeleted:"Canal eliminado.",
-    toastDeletedN:"{n} canal(es) eliminados.",
-    toastLoadFirst:"¡Carga un archivo de mapa primero!",
-    toastNumError:"El número de canal debe ser un entero.",
-    model:"MODELO",fw:"FW",panel:"PANEL",
-    theme:"Tema",lang:"Idioma"
+  es:{dir:"ltr",label:"Español",title:"Samsung",ta:"Editor de Canales",sub:"EDICIÓN WEB — v6.4 — PROCESAMIENTO LOCAL",
+    drop:"Suelta tu archivo {0} aquí",dropSub:"o haz clic — soporta map-AirD, map-AirA, map-CableA",dropFolder:"O suelta la carpeta Clone completa",
+    loadAux:"+ Cargar ProductCloneInfo / FADAT",howT:"CÓMO FUNCIONA",h1:"1. Clonar TV a USB (Mute→1→1→9→Enter)",h2:"2. Sube tu archivo {0}",h3:"3. Edita canales, CSV para edición masiva",h4:"4. Descarga y flashea al TV",
+    open:"Abrir",save:"Guardar y Descargar",backup:"Descargar Original",expCsv:"Exportar CSV",impCsv:"Importar CSV",
+    delN:"Eliminar ({0})",search:"Buscar...",chAct:"{0} canales activos",
+    cCh:"CH #",cNm:"Nombre del Canal",cAct:"Acciones",noM:"Sin coincidencias.",noA:"Sin canales activos.",
+    foot:"Samsung Hospitality Editor — Web",
+    tLoad:"Cargados {0} canales de {1}",tSave:"¡Descargado! Flashea vía USB.",tBak:"Backup descargado.",
+    tCsvO:"CSV exportado.",tCsvB:"CSV inválido.",tCsvI:"{0} canales actualizados.",
+    tUpd:"Actualizado.",tDel:"Eliminado.",tDelN:"{0} eliminados.",tFirst:"¡Carga un mapa!",tNum:"Debe ser entero.",tDup:"Advertencia: CH {0} duplicado.",tFolder:"Auto-detectado desde Clone.",
+    mod:"MODELO",fw:"FW",pan:"CÓD. PANEL",disp:"PANTALLA",ser:"SERIE",rev:"REV",
+    helpM:"Ayuda",hcT:"Cómo Clonar",hmT:"Tipos de Map",haT:"Acerca de",
+    hcB:"EXTRAER:\n1. Enciende TV\n2. USB\n3. Menu Hotel\n4. Clone TV to USB\n5. Espera\n\n──────────────────────────────\n\nCARGAR:\n1. Enciende TV\n2. USB\n3. Menu Hotel\n4. Clone USB to TV",
+    hmB:"► map-AirD (Recomendado)\n   Canales Digitales\n\n► map-AirA / map-CableA\n   Analógicos / Cable",
+    haB:"Samsung Hospitality Editor\nv6.4 Web\n\nPor deadboy18",
+    edT:"Editar Canal",edN:"Número",edNm:"Nombre",edS:"Guardar",edC:"Cancelar",
+    cdT:"Confirmar",cdB:"¿Eliminar {0} canal(es)?",cdY:"Sí",cdN:"Cancelar",
+    ciT:"Info CSV",ciB:"No edites la columna Index.",ciO:"Entendido",
+    ctE:"Editar",ctD:"Eliminar",sReady:"Listo.",sLoad:"{0} registros de {1}. {2} activos.",sEdit:"Sin guardar."
   },
-  fr:{
-    code:"fr",dir:"ltr",label:"Français",
-    title:"Samsung",titleAccent:"Éditeur de Chaînes",
-    subtitle:"ÉDITION WEB — v6.4 — TRAITEMENT 100% LOCAL DANS VOTRE NAVIGATEUR",
-    dropTitle:"Déposez votre fichier {file} ici",
-    dropSub:"ou cliquez pour parcourir — accepte aussi map-AirA, map-CableA",
-    loadAux:"+ Charger ProductCloneInfo / FADAT",
-    howTitle:"COMMENT ÇA MARCHE",
-    how1:'1. Cloner TV vers USB via Menu Hôtel (Mute → 1 → 1 → 9 → Enter)',
-    how2:'2. Téléversez votre fichier {file} ici',
-    how3:'3. Modifiez les chaînes, exportez/importez CSV pour édition en masse',
-    how4:'4. Téléchargez le fichier modifié et flashez-le sur le TV',
-    openMap:"Ouvrir Map",saveDownload:"Sauver & Télécharger",
-    exportCsv:"Exporter CSV",importCsv:"Importer CSV",
-    deleteN:"Supprimer {n}",search:"Rechercher des chaînes...",
-    chActive:"{n} chaîne active",chsActive:"{n} chaînes actives",
-    colCh:"CH #",colName:"Nom de la Chaîne",colActions:"Actions",
-    noMatch:"Aucune chaîne ne correspond.",
-    noActive:"Aucune chaîne active trouvée.",
-    footer:"Samsung Hospitality Editor — Édition Web — Aucune donnée ne quitte votre navigateur",
-    toastLoaded:"{n} chaînes actives chargées de {f}",
-    toastSaved:"Map téléchargé ! Flashez-le sur le TV via USB.",
-    toastCsvOut:"CSV exporté — éditez dans Excel, puis réimportez.",
-    toastCsvBad:"CSV invalide — colonne 'Index (DO NOT EDIT)' manquante.",
-    toastCsvIn:"{n} chaînes mises à jour depuis CSV.",
-    toastUpdated:"Chaîne mise à jour.",
-    toastDeleted:"Chaîne supprimée.",
-    toastDeletedN:"{n} chaîne(s) supprimée(s).",
-    toastLoadFirst:"Chargez d'abord un fichier map !",
-    toastNumError:"Le numéro de chaîne doit être un entier.",
-    model:"MODÈLE",fw:"FW",panel:"PANNEAU",
-    theme:"Thème",lang:"Langue"
+  fr:{dir:"ltr",label:"Français",title:"Samsung",ta:"Éditeur de Chaînes",sub:"ÉDITION WEB — v6.4 — TRAITEMENT LOCAL",
+    drop:"Déposez {0} ici",dropSub:"ou cliquez — supporte map-AirD, map-AirA, map-CableA",dropFolder:"Ou déposez le dossier Clone entier",
+    loadAux:"+ Charger ProductCloneInfo / FADAT",howT:"COMMENT ÇA MARCHE",h1:"1. Cloner TV→USB (Mute→1→1→9→Enter)",h2:"2. Téléversez {0}",h3:"3. Éditez, CSV pour masse",h4:"4. Téléchargez et flashez",
+    open:"Ouvrir",save:"Sauver & Télécharger",backup:"Télécharger Original",expCsv:"Exporter CSV",impCsv:"Importer CSV",
+    delN:"Supprimer ({0})",search:"Rechercher...",chAct:"{0} chaînes actives",
+    cCh:"CH #",cNm:"Nom",cAct:"Actions",noM:"Aucun résultat.",noA:"Aucune chaîne active.",
+    foot:"Samsung Hospitality Editor — Web",
+    tLoad:"{0} chaînes de {1}",tSave:"Téléchargé! Flashez via USB.",tBak:"Backup téléchargé.",
+    tCsvO:"CSV exporté.",tCsvB:"CSV invalide.",tCsvI:"{0} chaînes mises à jour.",
+    tUpd:"Mise à jour.",tDel:"Supprimé.",tDelN:"{0} supprimé(s).",tFirst:"Chargez un map!",tNum:"Doit être entier.",tDup:"Attention: CH {0} en double.",tFolder:"Auto-détecté depuis Clone.",
+    mod:"MODÈLE",fw:"FW",pan:"CODE PANNEAU",disp:"ÉCRAN",ser:"SÉRIE",rev:"RÉV",
+    helpM:"Aide",hcT:"Cloner (USB)",hmT:"Types de Map",haT:"À propos",
+    hcB:"EXTRAIRE:\n1. Allumez TV\n2. USB\n3. Menu Hôtel\n4. Clone TV to USB\n\n──────────────────────────────\n\nCHARGER:\n1. Allumez TV\n2. USB modifié\n3. Menu Hôtel\n4. Clone USB to TV",
+    hmB:"► map-AirD (Recommandé)\n   Numériques Terrestres\n\n► map-AirA / map-CableA\n   Analogiques / Câble",
+    haB:"Samsung Hospitality Editor\nv6.4 Web\n\nPar deadboy18",
+    edT:"Éditer",edN:"Numéro",edNm:"Nom",edS:"Sauver",edC:"Annuler",
+    cdT:"Confirmer",cdB:"Supprimer {0} chaîne(s)?",cdY:"Oui",cdN:"Annuler",
+    ciT:"Info CSV",ciB:"Ne pas éditer la colonne Index.",ciO:"Compris",
+    ctE:"Éditer",ctD:"Supprimer",sReady:"Prêt.",sLoad:"{0} enregistrements de {1}. {2} actives.",sEdit:"Non sauvegardé."
   }
 };
+function T(l,k,...a){let s=L_DATA[l]?.[k]||L_DATA.en[k]||k;a.forEach((v,i)=>{s=s.replace('{'+i+'}',v)});return s}
 
-function t(lang,key,...args){
-  let s=LANGS[lang]?.[key]||LANGS.en[key]||key;
-  args.forEach((v,i)=>{s=s.replace(/\{[^}]+\}/,v)});
-  return s;
+/* ═══════════════════ BINARY ENGINE ═══════════════════ */
+const RS=320,MR=1000,NO=65,NL=100,CO=319;
+function parseRec(i,d){const v=new DataView(d.buffer,d.byteOffset,d.byteLength);const cn=v.getUint16(0,true);let nm="";try{nm=new TextDecoder("utf-16le").decode(d.slice(NO,NO+NL)).split("\x00")[0]}catch{}return{index:i,raw:new Uint8Array(d),chNum:cn,name:nm,isActive:cn!==0&&cn!==0xFFFF&&nm.length>0}}
+function updRec(r,nn,nm){const raw=new Uint8Array(r.raw),v=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);const n=parseInt(nn,10);v.setUint16(0,n,true);const u=new Uint8Array(NL).fill(0);const s=String(nm);for(let i=0;i<s.length&&i*2<NL;i++){const c=s.charCodeAt(i);u[i*2]=c&0xFF;u[i*2+1]=(c>>8)&0xFF}raw.set(u,NO);let sm=0;for(let i=0;i<CO;i++)sm+=raw[i];raw[CO]=sm%256;return{...r,raw,chNum:n,name:s,isActive:true}}
+function delRec(r){const raw=new Uint8Array(r.raw),v=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);v.setUint16(0,0,true);raw.fill(0,NO,NO+NL);let sm=0;for(let i=0;i<CO;i++)sm+=raw[i];raw[CO]=sm%256;return{...r,raw,chNum:0,name:"",isActive:false}}
+function recsBlob(recs){const b=new Uint8Array(recs.length*RS);recs.forEach((r,i)=>b.set(r.raw,i*RS));return new Blob([b],{type:"application/octet-stream"})}
+function expCSV(recs){const a=recs.filter(r=>r.isActive).sort((a,b)=>a.chNum-b.chNum);let c="Index (DO NOT EDIT),Channel Number,Channel Name\n";a.forEach(r=>{c+=`${r.index},${r.chNum},"${r.name.replace(/"/g,'""')}"\n`});return c}
+function impCSV(t){const ls=t.split(/\r?\n/).filter(l=>l.trim());if(!ls[0]?.includes("Index (DO NOT EDIT)"))return null;const rows=[];for(let i=1;i<ls.length;i++){const ps=[];let cur="",inQ=false;for(const ch of ls[i]){if(ch==='"')inQ=!inQ;else if(ch===','&&!inQ){ps.push(cur);cur=""}else cur+=ch}ps.push(cur);if(ps.length>=3){const idx=parseInt(ps[0],10),num=parseInt(ps[1],10);if(!isNaN(idx)&&!isNaN(num))rows.push({idx,num,name:ps[2]})}}return rows}
+
+/* ═══════════════════ HARDWARE DETECTION — matches Python tool ═══════════════════ */
+function parsePCI(d){try{const t=new TextDecoder("utf-8",{fatal:false}).decode(d.slice(4));return{model:t.includes("#")?t.split("#")[1]?.split("%")[0]||null:null,fw:t.includes("@")?t.split("@")[0]:null}}catch{return{}}}
+function parseFADAT(d){
+  let ft="";for(let i=0;i<d.length;i++){const b=d[i];ft+=(b>=32&&b<=126)?String.fromCharCode(b):" "}
+  const fw=(ft.match(/T-[A-Z0-9]+/)||[])[0]||null;
+  const panel=(ft.match(/\b(\d{2}[A-Z]\d[A-Z0-9]*)\b/)||[])[1]||null;
+  const model=(ft.match(/\b(H[A-Z]\d{3})\b/)||[])[0]||null;
+  let displaySize=null,series=null,panelRev=null;
+  if(panel){displaySize=panel.slice(0,2);series=panel.slice(2,4);panelRev=panel.slice(4)||null}
+  return{fw,panel,model,displaySize,series,panelRev};
+}
+function mergeHW(base,pci,fad){
+  const hw={...base};
+  if(pci?.model)hw.model=pci.model;
+  if(pci?.fw)hw.fw=pci.fw;
+  if(fad?.fw&&!hw.fw)hw.fw=fad.fw;
+  if(fad?.panel)hw.panel=fad.panel;
+  if(fad?.model&&!hw.model)hw.model=fad.model;
+  if(fad?.displaySize)hw.displaySize=fad.displaySize;
+  if(fad?.series)hw.series=fad.series;
+  if(fad?.panelRev)hw.panelRev=fad.panelRev;
+  return hw;
 }
 
-/* ============================================================
-   BINARY PARSING — identical to Python tool
-   ============================================================ */
-const RECORD_SIZE=320,MAX_RECORDS=1000,NAME_OFFSET=65,NAME_LENGTH=100,CHECKSUM_OFFSET=319;
-
-function parseRecord(index,data){
-  const dv=new DataView(data.buffer,data.byteOffset,data.byteLength);
-  const chNum=dv.getUint16(0,true);
-  let name="";
-  try{name=new TextDecoder("utf-16le").decode(data.slice(NAME_OFFSET,NAME_OFFSET+NAME_LENGTH)).split("\x00")[0]}catch{}
-  return{index,raw:new Uint8Array(data),chNum,name,isActive:chNum!==0&&chNum!==0xFFFF&&name.length>0};
-}
-
-function updateRecord(rec,newNum,newName){
-  const raw=new Uint8Array(rec.raw),dv=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
-  const num=parseInt(newNum,10);
-  dv.setUint16(0,num,true);
-  const utf16=new Uint8Array(NAME_LENGTH).fill(0);
-  const str=String(newName);
-  for(let i=0;i<str.length&&i*2<NAME_LENGTH;i++){const c=str.charCodeAt(i);utf16[i*2]=c&0xFF;utf16[i*2+1]=(c>>8)&0xFF}
-  raw.set(utf16,NAME_OFFSET);
-  let sum=0;for(let i=0;i<CHECKSUM_OFFSET;i++)sum+=raw[i];
-  raw[CHECKSUM_OFFSET]=sum%256;
-  return{...rec,raw,chNum:num,name:str,isActive:true};
-}
-
-function deleteRecord(rec){
-  const raw=new Uint8Array(rec.raw),dv=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
-  dv.setUint16(0,0,true);raw.fill(0,NAME_OFFSET,NAME_OFFSET+NAME_LENGTH);
-  let sum=0;for(let i=0;i<CHECKSUM_OFFSET;i++)sum+=raw[i];
-  raw[CHECKSUM_OFFSET]=sum%256;
-  return{...rec,raw,chNum:0,name:"",isActive:false};
-}
-
-function recordsToBlob(records){
-  const buf=new Uint8Array(records.length*RECORD_SIZE);
-  records.forEach((r,i)=>buf.set(r.raw,i*RECORD_SIZE));
-  return new Blob([buf],{type:"application/octet-stream"});
-}
-
-function exportCSV(records){
-  const active=records.filter(r=>r.isActive).sort((a,b)=>a.chNum-b.chNum);
-  let csv="Index (DO NOT EDIT),Channel Number,Channel Name\n";
-  active.forEach(r=>{csv+=`${r.index},${r.chNum},"${r.name.replace(/"/g,'""')}"\n`});
-  return csv;
-}
-
-function parseCSV(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim());
-  if(!lines[0]?.includes("Index (DO NOT EDIT)"))return null;
-  const rows=[];
-  for(let i=1;i<lines.length;i++){
-    const parts=[];let cur="",inQ=false;
-    for(const ch of lines[i]){if(ch==='"')inQ=!inQ;else if(ch===','&&!inQ){parts.push(cur);cur=""}else cur+=ch}
-    parts.push(cur);
-    if(parts.length>=3){const idx=parseInt(parts[0],10),num=parseInt(parts[1],10);if(!isNaN(idx)&&!isNaN(num))rows.push({idx,num,name:parts[2]})}
-  }
-  return rows;
-}
-
-function parseProductCloneInfo(data){
-  try{const txt=new TextDecoder("utf-8",{fatal:false}).decode(data.slice(4));
-  return{model:txt.includes("#")?txt.split("#")[1]?.split("%")[0]||"Unknown":"Unknown",fw:txt.includes("@")?txt.split("@")[0]:"Unknown"}}catch{return{model:"Unknown",fw:"Unknown"}}
-}
-function parseFADAT(data){
-  let ft="";for(let i=0;i<data.length;i++){const b=data[i];ft+=(b>=32&&b<=126)?String.fromCharCode(b):" "}
-  return{fw:(ft.match(/T-[A-Z0-9]+/)||[])[0]||null,panel:(ft.match(/\b(\d{2}[A-Z]\d[A-Z0-9]*)\b/)||[])[1]||null,model:(ft.match(/\b(H[A-Z]\d{3})\b/)||[])[0]||null};
-}
-
-/* ============================================================
-   SVG ICONS
-   ============================================================ */
-const Icon=({d,size=16,color="currentColor"})=>React.createElement("svg",{width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:color,strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round"},d);
-
+/* ═══════════════════ ICONS ═══════════════════ */
 const UploadIcon=()=><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 const SaveIcon=()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
 const TrashIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>;
@@ -345,276 +224,319 @@ const EditIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 const SunIcon=()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
 const MoonIcon=()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>;
 const GlobeIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>;
-const SearchIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const HelpIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+const DlIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+const FolderIcon=()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>;
+const TvIcon=()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>;
 
-/* ============================================================
-   MAIN APP
-   ============================================================ */
+/* ═══════════════════ MODAL ═══════════════════ */
+function Modal({open,onClose,title,children}){
+  if(!open)return null;
+  return(<div onClick={onClose} style={{position:"fixed",inset:0,zIndex:200,background:"var(--modal-bg)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:"var(--modal-card)",border:"1px solid var(--border2)",borderRadius:8,width:"100%",maxWidth:480,maxHeight:"80vh",display:"flex",flexDirection:"column",animation:"modalIn .2s ease",boxShadow:"0 20px 60px rgba(0,0,0,.4)"}}>
+      <div style={{padding:"14px 18px",borderBottom:"1px solid var(--border2)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <span style={{fontWeight:700,fontSize:14,color:"var(--text2)"}}>{title}</span>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"var(--text4)",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>
+      </div>
+      <div style={{padding:"16px 18px",overflowY:"auto",flex:1}}>{children}</div>
+    </div>
+  </div>);
+}
+
+/* ═══════════════════ HW INFO PANEL — matches Python layout ═══════════════════ */
+function HWPanel({hw,L}){
+  if(!hw)return null;
+  const Row=({label,val})=>val?<div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{color:"var(--text5)",fontSize:10}}>{label}</span><span style={{color:"var(--text2)",fontSize:11,fontWeight:600}}>{val}</span></div>:null;
+  return(
+    <div style={{background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:6,padding:"10px 14px",minWidth:220,animation:"slideUp .3s ease"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,color:"var(--accent)"}}><TvIcon/><span style={{fontSize:11,fontWeight:700,letterSpacing:1}}>TV HARDWARE</span></div>
+      <Row label={L("mod")} val={hw.model}/>
+      <Row label={L("fw")} val={hw.fw}/>
+      <Row label={L("pan")} val={hw.panel}/>
+      {hw.displaySize&&<div style={{borderTop:"1px solid var(--border2)",marginTop:5,paddingTop:5}}>
+        <Row label={L("disp")} val={hw.displaySize+'" ('+hw.series+' Series)'}/>
+        {hw.panelRev&&<Row label={L("rev")} val={hw.panelRev}/>}
+      </div>}
+    </div>
+  );
+}
+
+/* ═══════════════════ MAIN APP ═══════════════════ */
 function App(){
   const[theme,setTheme]=useState(()=>localStorage.getItem("se_theme")||"dark");
   const[lang,setLang]=useState(()=>localStorage.getItem("se_lang")||"en");
-  const[records,setRecords]=useState([]);
-  const[fileName,setFileName]=useState("");
+  const[recs,setRecs]=useState([]);
+  const[origBlob,setOrigBlob]=useState(null);
+  const[fName,setFName]=useState("");
   const[search,setSearch]=useState("");
-  const[sortKey,setSortKey]=useState("num");
-  const[sortAsc,setSortAsc]=useState(true);
-  const[selected,setSelected]=useState(new Set());
-  const[editingIdx,setEditingIdx]=useState(null);
-  const[editNum,setEditNum]=useState("");
-  const[editName,setEditName]=useState("");
-  const[hwInfo,setHwInfo]=useState(null);
+  const[sKey,setSKey]=useState("num");
+  const[sAsc,setSAsc]=useState(true);
+  const[sel,setSel]=useState(new Set());
+  const[hw,setHw]=useState(null);
   const[toast,setToast]=useState(null);
-  const[dragOver,setDragOver]=useState(false);
-  const[langOpen,setLangOpen]=useState(false);
-  const fileRef=useRef(),csvRef=useRef(),auxRef=useRef(),langRef=useRef();
+  const[drag,setDrag]=useState(false);
+  const[langO,setLangO]=useState(false);
+  const[helpO,setHelpO]=useState(false);
+  const[dirty,setDirty]=useState(false);
+  const[editM,setEditM]=useState(null);
+  const[confM,setConfM]=useState(null);
+  const[helpM,setHelpM]=useState(null);
+  const[csvM,setCsvM]=useState(false);
+  const[ctx,setCtx]=useState(null);
+  const fRef=useRef(),cRef=useRef(),aRef=useRef(),lRef=useRef(),hRef=useRef();
 
   useEffect(()=>{document.documentElement.setAttribute("data-theme",theme);localStorage.setItem("se_theme",theme)},[theme]);
-  useEffect(()=>{document.documentElement.setAttribute("dir",LANGS[lang]?.dir||"ltr");localStorage.setItem("se_lang",lang)},[lang]);
-  useEffect(()=>{
-    const close=e=>{if(langRef.current&&!langRef.current.contains(e.target))setLangOpen(false)};
-    document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close);
+  useEffect(()=>{document.documentElement.setAttribute("dir",L_DATA[lang]?.dir||"ltr");localStorage.setItem("se_lang",lang)},[lang]);
+  useEffect(()=>{const c=e=>{if(lRef.current&&!lRef.current.contains(e.target))setLangO(false);if(hRef.current&&!hRef.current.contains(e.target))setHelpO(false);setCtx(null)};document.addEventListener("mousedown",c);return()=>document.removeEventListener("mousedown",c)},[]);
+
+  const $=useCallback((k,...a)=>T(lang,k,...a),[lang]);
+  const toast$=useCallback((m,t="info")=>{setToast({m,t});setTimeout(()=>setToast(null),4000)},[]);
+  const dl=(b,n)=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=n;a.click();URL.revokeObjectURL(a.href)};
+  const isRTL=L_DATA[lang]?.dir==="rtl";
+
+  // LOAD MAP
+  const loadMap=useCallback(file=>{
+    if(!file)return;setFName(file.name);
+    const r=new FileReader();
+    r.onload=e=>{const buf=new Uint8Array(e.target.result);setOrigBlob(new Blob([buf],{type:"application/octet-stream"}));
+      const rc=[];for(let i=0;i<MR;i++){const o=i*RS;if(o+RS>buf.length)break;rc.push(parseRec(i,buf.slice(o,o+RS)))}
+      setRecs(rc);setSel(new Set());setDirty(false);
+      toast$($("tLoad",rc.filter(x=>x.isActive).length,file.name),"success");
+    };r.readAsArrayBuffer(file);
+  },[toast$,$]);
+
+  // DROP — file or folder
+  const onDrop=useCallback(e=>{
+    e.preventDefault();setDrag(false);
+    const items=e.dataTransfer.items;
+    if(items?.length){
+      const entries=[];for(let i=0;i<items.length;i++){const en=items[i].webkitGetAsEntry?.();if(en)entries.push(en)}
+      if(entries.length===1&&entries[0].isDirectory){
+        const dr=entries[0].createReader();
+        dr.readEntries(fes=>{
+          let mapEntry=null,hwData={};let pending=fes.length;
+          const done=()=>{if(--pending<=0){if(mapEntry)mapEntry.file(f=>loadMap(f));if(Object.keys(hwData).length)setHw(hwData);toast$($("tFolder"),"success")}};
+          fes.forEach(fe=>{if(!fe.isFile){done();return}
+            if(fe.name.startsWith("map-AirD")||(!mapEntry&&(fe.name.startsWith("map-AirA")||fe.name.startsWith("map-CableA")))){mapEntry=fe;done()}
+            else if(fe.name==="ProductCloneInfo"){fe.file(f=>{const r=new FileReader();r.onload=ev=>{hwData=mergeHW(hwData,parsePCI(new Uint8Array(ev.target.result)),null);setHw({...hwData});done()};r.readAsArrayBuffer(f)})}
+            else if(fe.name==="FADAT"){fe.file(f=>{const r=new FileReader();r.onload=ev=>{hwData=mergeHW(hwData,null,parseFADAT(new Uint8Array(ev.target.result)));setHw({...hwData});done()};r.readAsArrayBuffer(f)})}
+            else done()});
+        });return;
+      }
+    }
+    const f=e.dataTransfer.files[0];if(f)loadMap(f);
+  },[loadMap,toast$,$]);
+
+  // AUX FILES
+  const loadAux=useCallback(files=>{
+    let hwD={};
+    Array.from(files).forEach(f=>{const r=new FileReader();r.onload=e=>{const d=new Uint8Array(e.target.result);
+      if(f.name==="ProductCloneInfo")hwD=mergeHW(hwD,parsePCI(d),null);
+      else if(f.name==="FADAT")hwD=mergeHW(hwD,null,parseFADAT(d));
+      setHw({...hwD})};r.readAsArrayBuffer(f)});
   },[]);
 
-  const T=useCallback((key,...args)=>t(lang,key,...args),[lang]);
+  // SAVE / BACKUP
+  const doSave=useCallback(()=>{if(!recs.length)return;dl(recsBlob(recs),fName||"map-AirD");toast$($("tSave"),"success");setDirty(false)},[recs,fName,toast$,$]);
+  const doBak=useCallback(()=>{if(!origBlob)return;const ts=new Date().toISOString().replace(/[:.]/g,"").slice(0,15);dl(origBlob,(fName||"map-AirD")+"_"+ts+".bak");toast$($("tBak"),"info")},[origBlob,fName,toast$,$]);
 
-  const showToast=useCallback((msg,type="info")=>{setToast({msg,type});setTimeout(()=>setToast(null),3500)},[]);
+  // CSV
+  const doExpCsv=useCallback(()=>{setCsvM(false);dl(new Blob([expCSV(recs)],{type:"text/csv"}),(fName||"channels")+".csv");toast$($("tCsvO"),"info")},[recs,fName,toast$,$]);
+  const doImpCsv=useCallback(f=>{if(!f||!recs.length){toast$($("tFirst"),"error");return}
+    const r=new FileReader();r.onload=e=>{const rows=impCSV(e.target.result);if(!rows){toast$($("tCsvB"),"error");return}
+      let u=0;const nr=[...recs];rows.forEach(({idx,num,name})=>{if(idx>=0&&idx<nr.length){nr[idx]=updRec(nr[idx],num,name);u++}});
+      setRecs(nr);setDirty(true);toast$($("tCsvI",u),"success")};r.readAsText(f);
+  },[recs,toast$,$]);
 
-  const handleMapFile=useCallback(file=>{
-    if(!file)return;setFileName(file.name);
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const buf=new Uint8Array(e.target.result),recs=[];
-      for(let i=0;i<MAX_RECORDS;i++){const off=i*RECORD_SIZE;if(off+RECORD_SIZE>buf.length)break;recs.push(parseRecord(i,buf.slice(off,off+RECORD_SIZE)))}
-      setRecords(recs);setSelected(new Set());setEditingIdx(null);
-      showToast(T("toastLoaded",recs.filter(r=>r.isActive).length,file.name),"success");
-    };reader.readAsArrayBuffer(file);
-  },[showToast,T]);
+  // EDIT
+  const openEd=useCallback(rec=>{setEditM({rec,num:String(rec.chNum),name:rec.name})},[]);
+  const doEd=useCallback(()=>{if(!editM)return;const n=parseInt(editM.num,10);if(isNaN(n)){toast$($("tNum"),"error");return}
+    if(recs.some(r=>r.isActive&&r.index!==editM.rec.index&&r.chNum===n))toast$($("tDup",n),"warn");
+    const nr=[...recs];nr[editM.rec.index]=updRec(nr[editM.rec.index],n,editM.name);setRecs(nr);setEditM(null);setDirty(true);toast$($("tUpd"),"success");
+  },[editM,recs,toast$,$]);
 
-  const onDrop=useCallback(e=>{e.preventDefault();setDragOver(false);const f=e.dataTransfer.files[0];if(f)handleMapFile(f)},[handleMapFile]);
+  // DELETE
+  const reqDel=useCallback(indices=>{const s=indices instanceof Set?indices:new Set([indices]);if(!s.size)return;
+    setConfM({count:s.size,fn:()=>{const nr=[...recs];s.forEach(i=>{nr[i]=delRec(nr[i])});setRecs(nr);setDirty(true);toast$($("tDelN",s.size),"info");setSel(new Set());setConfM(null)}});
+  },[recs,toast$,$]);
 
-  const handleAuxFiles=useCallback(files=>{
-    let info={model:"Unknown",fw:"Unknown",panel:"Unknown"};
-    Array.from(files).forEach(file=>{const reader=new FileReader();
-      reader.onload=e=>{const data=new Uint8Array(e.target.result);
-        if(file.name==="ProductCloneInfo"){const p=parseProductCloneInfo(data);info={...info,...p}}
-        else if(file.name==="FADAT"){const f=parseFADAT(data);if(f.fw&&info.fw==="Unknown")info.fw=f.fw;if(f.panel)info.panel=f.panel;if(f.model&&info.model==="Unknown")info.model=f.model}
-        setHwInfo({...info})};reader.readAsArrayBuffer(file)});
-  },[]);
+  // SELECT / SORT
+  const togSel=useCallback(i=>{setSel(p=>{const s=new Set(p);s.has(i)?s.delete(i):s.add(i);return s})},[]);
+  const togSort=useCallback(k=>{if(sKey===k)setSAsc(p=>!p);else{setSKey(k);setSAsc(true)}},[sKey]);
 
-  const handleSave=useCallback(()=>{
-    if(!records.length)return;const blob=recordsToBlob(records);
-    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=fileName||"map-AirD";a.click();URL.revokeObjectURL(a.href);
-    showToast(T("toastSaved"),"success");
-  },[records,fileName,showToast,T]);
+  // FILTERED + SORTED
+  const active=useMemo(()=>{let l=recs.filter(r=>r.isActive);if(search){const q=search.toLowerCase();l=l.filter(r=>r.name.toLowerCase().includes(q)||String(r.chNum).includes(q))}l.sort((a,b)=>{let c=sKey==="num"?a.chNum-b.chNum:a.name.localeCompare(b.name);return sAsc?c:-c});return l},[recs,search,sKey,sAsc]);
+  const totAct=recs.filter(r=>r.isActive).length;
 
-  const handleExportCSV=useCallback(()=>{
-    if(!records.length)return;const csv=exportCSV(records);
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=(fileName||"channels")+".csv";a.click();URL.revokeObjectURL(a.href);
-    showToast(T("toastCsvOut"),"info");
-  },[records,fileName,showToast,T]);
-
-  const handleImportCSV=useCallback(file=>{
-    if(!file||!records.length){showToast(T("toastLoadFirst"),"error");return}
-    const reader=new FileReader();
-    reader.onload=e=>{const rows=parseCSV(e.target.result);
-      if(!rows){showToast(T("toastCsvBad"),"error");return}
-      let updated=0;const nr=[...records];
-      rows.forEach(({idx,num,name})=>{if(idx>=0&&idx<nr.length){nr[idx]=updateRecord(nr[idx],num,name);updated++}});
-      setRecords(nr);showToast(T("toastCsvIn",updated),"success")};
-    reader.readAsText(file);
-  },[records,showToast,T]);
-
-  const startEdit=useCallback(rec=>{setEditingIdx(rec.index);setEditNum(String(rec.chNum));setEditName(rec.name)},[]);
-  const confirmEdit=useCallback(()=>{
-    const num=parseInt(editNum,10);if(isNaN(num)){showToast(T("toastNumError"),"error");return}
-    const nr=[...records];nr[editingIdx]=updateRecord(nr[editingIdx],num,editName);setRecords(nr);setEditingIdx(null);showToast(T("toastUpdated"),"success");
-  },[editingIdx,editNum,editName,records,showToast,T]);
-
-  const handleDelete=useCallback(()=>{
-    if(!selected.size)return;const nr=[...records];
-    selected.forEach(idx=>{nr[idx]=deleteRecord(nr[idx])});
-    setRecords(nr);showToast(T("toastDeletedN",selected.size),"info");setSelected(new Set());
-  },[selected,records,showToast,T]);
-
-  const toggleSelect=useCallback(idx=>{setSelected(p=>{const s=new Set(p);s.has(idx)?s.delete(idx):s.add(idx);return s})},[]);
-  const toggleSort=useCallback(key=>{if(sortKey===key)setSortAsc(p=>!p);else{setSortKey(key);setSortAsc(true)}},[sortKey]);
-
-  const activeRecords=useMemo(()=>{
-    let list=records.filter(r=>r.isActive);
-    if(search){const q=search.toLowerCase();list=list.filter(r=>r.name.toLowerCase().includes(q)||String(r.chNum).includes(q))}
-    list.sort((a,b)=>{let c=sortKey==="num"?a.chNum-b.chNum:a.name.localeCompare(b.name);return sortAsc?c:-c});
-    return list;
-  },[records,search,sortKey,sortAsc]);
-
-  const totalActive=records.filter(r=>r.isActive).length;
-  const isRTL=LANGS[lang]?.dir==="rtl";
-
-  /* --- STYLES using CSS vars --- */
-  const btnS=(bg,color,border)=>({background:bg||"var(--btn-bg)",color:color||"var(--text3)",border:`1px solid ${border||"var(--btn-border)"}`,
-    padding:"7px 14px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:500,display:"inline-flex",alignItems:"center",gap:6,lineHeight:1,transition:"opacity .15s"});
-  const microB=color=>({background:"transparent",border:`1px solid ${color}33`,color,width:28,height:28,borderRadius:4,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",padding:0});
+  // STYLES
+  const btn=(bg,c,bd)=>({background:bg||"var(--btn-bg)",color:c||"var(--text3)",border:`1px solid ${bd||"var(--btn-border)"}`,padding:"7px 14px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:500,display:"inline-flex",alignItems:"center",gap:6,lineHeight:1});
+  const mbtn=c=>({background:"transparent",border:`1px solid ${c}33`,color:c,width:28,height:28,borderRadius:4,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",padding:0});
+  const th={padding:"10px 12px",color:"var(--text4)",fontSize:11,fontWeight:600,textAlign:"center",textTransform:"uppercase",letterSpacing:1};
+  const td={padding:"8px 12px"};
+  const inp={background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text2)",padding:"8px 12px",borderRadius:4,fontSize:13,fontFamily:"inherit",outline:"none",width:"100%"};
+  const dd={display:"block",width:"100%",textAlign:"left",padding:"9px 14px",background:"transparent",color:"var(--text3)",border:"none",cursor:"pointer",fontSize:12,fontFamily:"inherit"};
 
   return(
-    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--text)",fontFamily:"var(--font)",position:"relative",transition:"background .25s, color .25s"}}>
+    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--text)",fontFamily:"var(--font)",display:"flex",flexDirection:"column"}}>
 
-      {/* Toast */}
-      {toast&&<div style={{position:"fixed",top:20,[isRTL?"left":"right"]:20,zIndex:100,padding:"12px 20px",borderRadius:4,
-        background:toast.type==="success"?"var(--success-bg)":toast.type==="error"?"var(--danger-bg2)":"var(--info-bg)",
-        border:`1px solid ${toast.type==="success"?"var(--success)":toast.type==="error"?"var(--danger)":"var(--accent)"}`,
-        color:toast.type==="success"?"var(--success-light)":toast.type==="error"?"var(--danger-light)":"var(--info-light)",
-        fontSize:13,fontFamily:"inherit",maxWidth:420,animation:"fadeIn .2s ease",direction:"ltr"}}>{toast.msg}</div>}
+      {/* TOAST */}
+      {toast&&<div style={{position:"fixed",top:20,right:20,zIndex:300,padding:"12px 20px",borderRadius:6,maxWidth:420,animation:"fadeIn .2s",boxShadow:"0 8px 24px rgba(0,0,0,.2)",fontSize:13,fontFamily:"inherit",direction:"ltr",
+        background:toast.t==="success"?"var(--success-bg)":toast.t==="error"?"var(--danger-bg2)":toast.t==="warn"?"var(--warn-bg)":"var(--info-bg)",
+        border:`1px solid ${toast.t==="success"?"var(--success)":toast.t==="error"?"var(--danger)":toast.t==="warn"?"var(--warn)":"var(--accent)"}`,
+        color:toast.t==="success"?"var(--success-light)":toast.t==="error"?"var(--danger-light)":toast.t==="warn"?"var(--warn-light)":"var(--info-light)"}}>{toast.m}</div>}
 
-      {/* Header */}
-      <div style={{padding:"20px 28px 14px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:8,height:8,borderRadius:"50%",background:records.length?"var(--success)":"var(--text5)",boxShadow:records.length?"0 0 8px var(--success)":"none",transition:"all .3s"}}/>
+      {/* CONTEXT MENU */}
+      {ctx&&<div style={{position:"fixed",left:ctx.x,top:ctx.y,zIndex:250,background:"var(--modal-card)",border:"1px solid var(--border2)",borderRadius:6,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,.3)",minWidth:170,animation:"slideUp .15s"}}>
+        <button onClick={()=>{openEd(recs[ctx.i]);setCtx(null)}} style={{...dd,color:"var(--text2)",display:"flex",alignItems:"center",gap:8}}><EditIcon/> {$("ctE")}</button>
+        <div style={{height:1,background:"var(--border2)"}}/>
+        <button onClick={()=>{reqDel(sel.size?sel:new Set([ctx.i]));setCtx(null)}} style={{...dd,color:"var(--danger)",display:"flex",alignItems:"center",gap:8}}><TrashIcon/> {$("ctD")}</button>
+      </div>}
+
+      {/* MODALS */}
+      <Modal open={!!editM} onClose={()=>setEditM(null)} title={$("edT")}>
+        {editM&&<div>
+          <label style={{fontSize:12,color:"var(--text4)",display:"block",marginBottom:4}}>{$("edN")}</label>
+          <input value={editM.num} onChange={e=>setEditM(p=>({...p,num:e.target.value}))} style={inp} autoFocus onKeyDown={e=>{if(e.key==="Enter")doEd()}}/>
+          <label style={{fontSize:12,color:"var(--text4)",display:"block",marginBottom:4,marginTop:14}}>{$("edNm")}</label>
+          <input value={editM.name} onChange={e=>setEditM(p=>({...p,name:e.target.value}))} style={inp} onKeyDown={e=>{if(e.key==="Enter")doEd()}}/>
+          <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}>
+            <button onClick={()=>setEditM(null)} style={btn()}>{$("edC")}</button>
+            <button onClick={doEd} style={btn("var(--accent3)","#fff","var(--accent2)")}>{$("edS")}</button>
+          </div>
+        </div>}
+      </Modal>
+      <Modal open={!!confM} onClose={()=>setConfM(null)} title={$("cdT")}>
+        {confM&&<div><p style={{fontSize:13,color:"var(--text2)",lineHeight:1.6}}>{$("cdB",confM.count)}</p>
+          <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}>
+            <button onClick={()=>setConfM(null)} style={btn()}>{$("cdN")}</button>
+            <button onClick={confM.fn} style={btn("var(--danger-bg)","var(--danger-light)","var(--danger)")}>{$("cdY")}</button>
+          </div></div>}
+      </Modal>
+      <Modal open={!!helpM} onClose={()=>setHelpM(null)} title={helpM?.t}>
+        {helpM&&<pre style={{fontSize:12,color:"var(--text2)",lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"inherit",margin:0}}>{helpM.b}</pre>}
+      </Modal>
+      <Modal open={csvM} onClose={()=>setCsvM(false)} title={$("ciT")}>
+        <pre style={{fontSize:12,color:"var(--text2)",lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"inherit",margin:0}}>{$("ciB")}</pre>
+        <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}><button onClick={doExpCsv} style={btn("var(--accent3)","#fff","var(--accent2)")}>{$("ciO")}</button></div>
+      </Modal>
+
+      {/* HEADER */}
+      <div style={{padding:"14px 24px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:recs.length?(dirty?"var(--warn)":"var(--success)"):"var(--text5)",boxShadow:recs.length?`0 0 8px ${dirty?"var(--warn)":"var(--success)"}`:"none"}}/>
           <div>
-            <h1 style={{margin:0,fontSize:19,fontWeight:700,color:"var(--text2)",letterSpacing:2,textTransform:"uppercase"}}>
-              {T("title")} <span style={{color:"var(--accent)"}}>{T("titleAccent")}</span>
-            </h1>
-            <p style={{margin:"2px 0 0",fontSize:10,color:"var(--text5)",letterSpacing:1}}>{T("subtitle")}</p>
+            <h1 style={{margin:0,fontSize:18,fontWeight:700,color:"var(--text2)",letterSpacing:2,textTransform:"uppercase"}}>{$("title")} <span style={{color:"var(--accent)"}}>{$("ta")}</span></h1>
+            <p style={{margin:"2px 0 0",fontSize:10,color:"var(--text5)",letterSpacing:1}}>{$("sub")}</p>
           </div>
         </div>
-
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {/* HW Info */}
-          {hwInfo&&<div className="hw-info" style={{fontSize:10,color:"var(--text3)",textAlign:"right",lineHeight:1.6,background:"var(--bg3)",padding:"6px 12px",border:"1px solid var(--border2)",borderRadius:4,marginRight:8}}>
-            <span style={{color:"var(--text5)"}}>{T("model")}:</span> <span style={{color:"var(--text2)"}}>{hwInfo.model}</span>&ensp;
-            <span style={{color:"var(--text5)"}}>{T("fw")}:</span> <span style={{color:"var(--text2)"}}>{hwInfo.fw}</span>&ensp;
-            {hwInfo.panel!=="Unknown"&&<><span style={{color:"var(--text5)"}}>{T("panel")}:</span> <span style={{color:"var(--text2)"}}>{hwInfo.panel}</span></>}
-          </div>}
-
-          {/* Theme Toggle */}
-          <button onClick={()=>setTheme(p=>p==="dark"?"light":"dark")} title={T("theme")}
-            style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text3)",width:34,height:34,borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
-            {theme==="dark"?<SunIcon/>:<MoonIcon/>}
-          </button>
-
-          {/* Language Dropdown */}
-          <div ref={langRef} style={{position:"relative"}}>
-            <button onClick={()=>setLangOpen(p=>!p)} title={T("lang")}
-              style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text3)",height:34,borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:6,padding:"0 10px",fontSize:12,fontFamily:"inherit"}}>
-              <GlobeIcon/> {LANGS[lang]?.label}
-            </button>
-            {langOpen&&<div style={{position:"absolute",top:"100%",[isRTL?"left":"right"]:0,marginTop:4,background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:6,overflow:"hidden",zIndex:90,minWidth:150,boxShadow:"0 8px 24px rgba(0,0,0,.3)"}}>
-              {Object.entries(LANGS).map(([k,v])=>(
-                <button key={k} onClick={()=>{setLang(k);setLangOpen(false)}}
-                  style={{display:"block",width:"100%",textAlign:"left",padding:"9px 14px",background:k===lang?"var(--select-bg)":"transparent",color:k===lang?"var(--accent)":"var(--text3)",border:"none",cursor:"pointer",fontSize:12,fontFamily:"inherit",direction:v.dir}}>
-                  {v.label}
-                </button>
-              ))}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          {/* HW INFO PANEL — full details like Python tool */}
+          <HWPanel hw={hw} L={$}/>
+          {/* HELP */}
+          <div ref={hRef} style={{position:"relative"}}>
+            <button onClick={()=>setHelpO(p=>!p)} style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text3)",height:32,borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"0 10px",fontSize:12,fontFamily:"inherit"}}><HelpIcon/> {$("helpM")}</button>
+            {helpO&&<div style={{position:"absolute",top:"100%",right:0,marginTop:4,background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:6,overflow:"hidden",zIndex:90,minWidth:190,boxShadow:"0 8px 24px rgba(0,0,0,.3)"}}>
+              <button onClick={()=>{setHelpM({t:$("hcT"),b:$("hcB")});setHelpO(false)}} style={dd}>{$("hcT")}</button>
+              <div style={{height:1,background:"var(--border2)"}}/>
+              <button onClick={()=>{setHelpM({t:$("hmT"),b:$("hmB")});setHelpO(false)}} style={dd}>{$("hmT")}</button>
+              <div style={{height:1,background:"var(--border2)"}}/>
+              <button onClick={()=>{setHelpM({t:$("haT"),b:$("haB")});setHelpO(false)}} style={dd}>{$("haT")}</button>
+            </div>}
+          </div>
+          {/* THEME */}
+          <button onClick={()=>setTheme(p=>p==="dark"?"light":"dark")} style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text3)",width:32,height:32,borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{theme==="dark"?<SunIcon/>:<MoonIcon/>}</button>
+          {/* LANG */}
+          <div ref={lRef} style={{position:"relative"}}>
+            <button onClick={()=>setLangO(p=>!p)} style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text3)",height:32,borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"0 10px",fontSize:12,fontFamily:"inherit"}}><GlobeIcon/> {L_DATA[lang]?.label}</button>
+            {langO&&<div style={{position:"absolute",top:"100%",right:0,marginTop:4,background:"var(--bg3)",border:"1px solid var(--border2)",borderRadius:6,overflow:"hidden",zIndex:90,minWidth:150,boxShadow:"0 8px 24px rgba(0,0,0,.3)"}}>
+              {Object.entries(L_DATA).map(([k,v])=><button key={k} onClick={()=>{setLang(k);setLangO(false)}} style={{...dd,background:k===lang?"var(--select-bg)":"transparent",color:k===lang?"var(--accent)":"var(--text3)",direction:v.dir}}>{v.label}</button>)}
             </div>}
           </div>
         </div>
       </div>
 
-      {/* NO FILE — Drop Zone */}
-      {!records.length?(
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"70px 28px",gap:20}}>
-          <div onDragOver={e=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop}
-            onClick={()=>fileRef.current?.click()}
-            style={{width:"100%",maxWidth:500,padding:"56px 28px",border:`2px dashed ${dragOver?"var(--accent)":"var(--border2)"}`,borderRadius:10,textAlign:"center",cursor:"pointer",
-              background:dragOver?"var(--select-bg)":"var(--bg4)",transition:"all .2s"}}>
-            <div style={{color:dragOver?"var(--accent)":"var(--text5)",marginBottom:14}}><UploadIcon/></div>
-            <p style={{margin:0,fontSize:14,color:"var(--text3)",fontWeight:600}} dangerouslySetInnerHTML={{__html:T("dropTitle",'<span style="color:var(--accent)">map-AirD</span>')}}/>
-            <p style={{margin:"8px 0 0",fontSize:12,color:"var(--text5)"}}>{T("dropSub")}</p>
+      {/* MAIN */}
+      <div style={{flex:1,display:"flex",flexDirection:"column"}}>
+      {!recs.length?(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"60px 24px",gap:18,flex:1}}>
+          <div onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={onDrop} onClick={()=>fRef.current?.click()}
+            style={{width:"100%",maxWidth:500,padding:"50px 28px",border:`2px dashed ${drag?"var(--accent)":"var(--border2)"}`,borderRadius:10,textAlign:"center",cursor:"pointer",background:drag?"var(--select-bg)":"var(--bg4)",transition:"all .2s"}}>
+            <div style={{color:drag?"var(--accent)":"var(--text5)",marginBottom:12}}><UploadIcon/></div>
+            <p style={{margin:0,fontSize:14,color:"var(--text3)",fontWeight:600}} dangerouslySetInnerHTML={{__html:$("drop",'<span style="color:var(--accent)">map-AirD</span>')}}/>
+            <p style={{margin:"8px 0 0",fontSize:12,color:"var(--text5)"}}>{$("dropSub")}</p>
+            <p style={{margin:"12px 0 0",fontSize:11,color:"var(--text6)",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><FolderIcon/> {$("dropFolder")}</p>
           </div>
-          <input ref={fileRef} type="file" style={{display:"none"}} onChange={e=>handleMapFile(e.target.files[0])}/>
-          <button onClick={()=>auxRef.current?.click()} style={{background:"transparent",border:"1px solid var(--border2)",color:"var(--text5)",padding:"8px 16px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
-            {T("loadAux")}
-          </button>
-          <input ref={auxRef} type="file" multiple style={{display:"none"}} onChange={e=>handleAuxFiles(e.target.files)}/>
-          <div style={{marginTop:28,maxWidth:460,fontSize:12,color:"var(--text6)",lineHeight:2,textAlign:"center"}}>
-            <p style={{color:"var(--text5)",fontWeight:600,marginBottom:6}}>{T("howTitle")}</p>
-            <p>{T("how1")}</p>
-            <p dangerouslySetInnerHTML={{__html:T("how2",'<code style="color:var(--accent)">map-AirD</code>')}}/>
-            <p>{T("how3")}</p>
-            <p>{T("how4")}</p>
+          <input ref={fRef} type="file" style={{display:"none"}} onChange={e=>loadMap(e.target.files[0])}/>
+          <button onClick={()=>aRef.current?.click()} style={{background:"transparent",border:"1px solid var(--border2)",color:"var(--text5)",padding:"7px 14px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>{$("loadAux")}</button>
+          <input ref={aRef} type="file" multiple style={{display:"none"}} onChange={e=>loadAux(e.target.files)}/>
+          <div style={{marginTop:24,maxWidth:460,fontSize:12,color:"var(--text6)",lineHeight:2,textAlign:"center"}}>
+            <p style={{color:"var(--text5)",fontWeight:600,marginBottom:4}}>{$("howT")}</p>
+            <p>{$("h1")}</p><p dangerouslySetInnerHTML={{__html:$("h2",'<code style="color:var(--accent)">map-AirD</code>')}}/>
+            <p>{$("h3")}</p><p>{$("h4")}</p>
           </div>
         </div>
       ):(
         <>
-          {/* Toolbar */}
-          <div className="toolbar-row" style={{padding:"10px 28px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",borderBottom:"1px solid var(--border)",background:"var(--bg2)"}}>
-            <button onClick={()=>fileRef.current?.click()} style={btnS()}>{T("openMap")}</button>
-            <input ref={fileRef} type="file" style={{display:"none"}} onChange={e=>handleMapFile(e.target.files[0])}/>
-            <button onClick={handleSave} style={btnS("var(--accent3)","#fff","var(--accent2)")}><SaveIcon/> {T("saveDownload")}</button>
-            <div style={{width:1,height:24,background:"var(--border2)",margin:"0 6px"}}/>
-            <button onClick={handleExportCSV} style={btnS()}>{T("exportCsv")}</button>
-            <button onClick={()=>csvRef.current?.click()} style={btnS()}>{T("importCsv")}</button>
-            <input ref={csvRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>{handleImportCSV(e.target.files[0]);e.target.value=""}}/>
-            {selected.size>0&&<>
-              <div style={{width:1,height:24,background:"var(--border2)",margin:"0 6px"}}/>
-              <button onClick={handleDelete} style={btnS("var(--danger-bg)","var(--danger-light)","var(--danger-bg)")}><TrashIcon/> {T("deleteN",selected.size)}</button>
-            </>}
+          {/* TOOLBAR */}
+          <div style={{padding:"8px 24px",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",borderBottom:"1px solid var(--border)",background:"var(--bg2)"}}>
+            <button onClick={()=>fRef.current?.click()} style={btn()}>{$("open")}</button>
+            <input ref={fRef} type="file" style={{display:"none"}} onChange={e=>loadMap(e.target.files[0])}/>
+            <button onClick={doSave} style={btn("var(--accent3)","#fff","var(--accent2)")}><SaveIcon/> {$("save")}</button>
+            {origBlob&&<button onClick={doBak} style={btn()}><DlIcon/> {$("backup")}</button>}
+            <div style={{width:1,height:24,background:"var(--border2)",margin:"0 4px"}}/>
+            <button onClick={()=>recs.length&&setCsvM(true)} style={btn()}>{$("expCsv")}</button>
+            <button onClick={()=>cRef.current?.click()} style={btn()}>{$("impCsv")}</button>
+            <input ref={cRef} type="file" accept=".csv" style={{display:"none"}} onChange={e=>{doImpCsv(e.target.files[0]);e.target.value=""}}/>
+            {sel.size>0&&<><div style={{width:1,height:24,background:"var(--border2)",margin:"0 4px"}}/><button onClick={()=>reqDel(sel)} style={btn("var(--danger-bg)","var(--danger-light)","var(--danger)")}><TrashIcon/> {$("delN",sel.size)}</button></>}
             <div style={{flex:1}}/>
             <div style={{position:"relative"}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={T("search")}
-                style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text2)",padding:"6px 12px 6px 30px",borderRadius:4,fontSize:12,fontFamily:"inherit",width:200,outline:"none"}}/>
-              <span style={{position:"absolute",left:10,top:8}}><SearchIcon/></span>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={$("search")} style={{background:"var(--bg3)",border:"1px solid var(--border2)",color:"var(--text2)",padding:"6px 12px 6px 30px",borderRadius:4,fontSize:12,fontFamily:"inherit",width:200,outline:"none"}}/>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text5)" strokeWidth="2" style={{position:"absolute",left:10,top:8}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </div>
-            <span style={{fontSize:11,color:"var(--text5)"}}>{totalActive>1?T("chsActive",totalActive):T("chActive",totalActive)}</span>
+            <span style={{fontSize:11,color:"var(--text5)"}}>{$("chAct",totAct)}</span>
           </div>
-
-          {/* Table */}
-          <div style={{padding:"0 28px 28px",overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",marginTop:10,fontSize:13}}>
-              <thead>
-                <tr style={{borderBottom:"1px solid var(--border2)"}}>
-                  <th style={thS}><input type="checkbox" checked={selected.size>0&&selected.size===activeRecords.length} onChange={()=>{
-                    const act=records.filter(r=>r.isActive);selected.size===act.length?setSelected(new Set()):setSelected(new Set(act.map(r=>r.index)))
-                  }}/></th>
-                  <th style={{...thS,cursor:"pointer",userSelect:"none"}} onClick={()=>toggleSort("num")}>{T("colCh")} {sortKey==="num"?(sortAsc?"▲":"▼"):""}</th>
-                  <th style={{...thS,cursor:"pointer",userSelect:"none",textAlign:isRTL?"right":"left"}} onClick={()=>toggleSort("name")}>{T("colName")} {sortKey==="name"?(sortAsc?"▲":"▼"):""}</th>
-                  <th style={thS}>{T("colActions")}</th>
+          {/* TABLE */}
+          <div style={{flex:1,padding:"0 24px 16px",overflowY:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",marginTop:8,fontSize:13}}>
+              <thead style={{position:"sticky",top:0,background:"var(--bg)",zIndex:10}}>
+                <tr style={{borderBottom:"2px solid var(--border2)"}}>
+                  <th style={{...th,width:40}}><input type="checkbox" checked={sel.size>0&&sel.size===active.length} onChange={()=>{const a=recs.filter(r=>r.isActive);sel.size===a.length?setSel(new Set()):setSel(new Set(a.map(r=>r.index)))}}/></th>
+                  <th style={{...th,cursor:"pointer",userSelect:"none",width:80}} onClick={()=>togSort("num")}>{$("cCh")} {sKey==="num"?(sAsc?"▲":"▼"):""}</th>
+                  <th style={{...th,cursor:"pointer",userSelect:"none",textAlign:isRTL?"right":"left"}} onClick={()=>togSort("name")}>{$("cNm")} {sKey==="name"?(sAsc?"▲":"▼"):""}</th>
+                  <th style={{...th,width:100}}>{$("cAct")}</th>
                 </tr>
               </thead>
               <tbody>
-                {activeRecords.map(rec=>(
-                  <tr key={rec.index} style={{borderBottom:"1px solid var(--border3)",background:selected.has(rec.index)?"var(--select-bg)":"transparent",transition:"background .1s"}}
-                    onMouseEnter={e=>{if(!selected.has(rec.index))e.currentTarget.style.background="var(--hover-bg)"}}
-                    onMouseLeave={e=>{if(!selected.has(rec.index))e.currentTarget.style.background="transparent"}}>
-                    <td style={{...tdS,textAlign:"center",width:40}}><input type="checkbox" checked={selected.has(rec.index)} onChange={()=>toggleSelect(rec.index)}/></td>
-                    <td style={{...tdS,textAlign:"center",width:80}}>
-                      {editingIdx===rec.index
-                        ?<input value={editNum} onChange={e=>setEditNum(e.target.value)} autoFocus onKeyDown={e=>{if(e.key==="Enter")confirmEdit();if(e.key==="Escape")setEditingIdx(null)}} style={inpS}/>
-                        :<span style={{color:"var(--accent)",fontWeight:600}}>{rec.chNum}</span>}
-                    </td>
-                    <td style={{...tdS,textAlign:isRTL?"right":"left"}}>
-                      {editingIdx===rec.index
-                        ?<input value={editName} onChange={e=>setEditName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")confirmEdit();if(e.key==="Escape")setEditingIdx(null)}} style={{...inpS,width:"100%"}}/>
-                        :<span style={{color:"var(--text2)"}}>{rec.name}</span>}
-                    </td>
-                    <td style={{...tdS,textAlign:"center",width:110}}>
-                      {editingIdx===rec.index
-                        ?<div style={{display:"flex",gap:6,justifyContent:"center"}}>
-                          <button onClick={confirmEdit} style={microB("var(--success)")}>✓</button>
-                          <button onClick={()=>setEditingIdx(null)} style={microB("var(--text5)")}>✕</button>
-                        </div>
-                        :<div style={{display:"flex",gap:6,justifyContent:"center"}}>
-                          <button onClick={()=>startEdit(rec)} style={microB("var(--accent)")} title="Edit"><EditIcon/></button>
-                          <button onClick={()=>{const nr=[...records];nr[rec.index]=deleteRecord(nr[rec.index]);setRecords(nr);selected.delete(rec.index);showToast(T("toastDeleted"),"info")}}
-                            style={microB("var(--danger)")} title="Delete"><TrashIcon/></button>
-                        </div>}
-                    </td>
+                {active.map(rec=>(
+                  <tr key={rec.index} onDoubleClick={()=>openEd(rec)} onContextMenu={e=>{e.preventDefault();if(!sel.has(rec.index))setSel(new Set([rec.index]));setCtx({x:e.clientX,y:e.clientY,i:rec.index})}}
+                    style={{borderBottom:"1px solid var(--border3)",background:sel.has(rec.index)?"var(--select-bg)":"transparent",cursor:"default"}}
+                    onMouseEnter={e=>{if(!sel.has(rec.index))e.currentTarget.style.background="var(--hover-bg)"}}
+                    onMouseLeave={e=>{if(!sel.has(rec.index))e.currentTarget.style.background="transparent"}}>
+                    <td style={{...td,textAlign:"center"}}><input type="checkbox" checked={sel.has(rec.index)} onChange={()=>togSel(rec.index)}/></td>
+                    <td style={{...td,textAlign:"center"}}><span style={{color:"var(--accent)",fontWeight:600}}>{rec.chNum}</span></td>
+                    <td style={{...td,textAlign:isRTL?"right":"left"}}><span style={{color:"var(--text2)"}}>{rec.name}</span></td>
+                    <td style={{...td,textAlign:"center"}}><div style={{display:"flex",gap:5,justifyContent:"center"}}>
+                      <button onClick={()=>openEd(rec)} style={mbtn("var(--accent)")}><EditIcon/></button>
+                      <button onClick={()=>reqDel(new Set([rec.index]))} style={mbtn("var(--danger)")}><TrashIcon/></button>
+                    </div></td>
                   </tr>
                 ))}
-                {activeRecords.length===0&&<tr><td colSpan={4} style={{textAlign:"center",padding:40,color:"var(--text6)"}}>{search?T("noMatch"):T("noActive")}</td></tr>}
+                {!active.length&&<tr><td colSpan={4} style={{textAlign:"center",padding:40,color:"var(--text6)"}}>{search?$("noM"):$("noA")}</td></tr>}
               </tbody>
             </table>
           </div>
         </>
       )}
+      </div>
 
-      {/* Footer */}
-      <div style={{padding:"12px 28px",borderTop:"1px solid var(--border)",fontSize:11,color:"var(--text6)",textAlign:"center"}}>{T("footer")}</div>
+      {/* STATUS BAR */}
+      <div style={{padding:"6px 24px",borderTop:"1px solid var(--border)",fontSize:11,color:"var(--text5)",display:"flex",justifyContent:"space-between",background:"var(--bg2)"}}>
+        <span>{recs.length?$("sLoad",recs.length,fName,totAct)+(dirty?" • "+$("sEdit"):""):$("sReady")}</span>
+        <span style={{color:"var(--text6)"}}>{$("foot")}</span>
+      </div>
     </div>
   );
 }
-
-const thS={padding:"10px 12px",color:"var(--text4)",fontSize:11,fontWeight:600,textAlign:"center",textTransform:"uppercase",letterSpacing:1};
-const tdS={padding:"8px 12px"};
-const inpS={background:"var(--bg3)",border:"1px solid var(--accent)",color:"var(--text2)",padding:"4px 8px",borderRadius:3,fontSize:13,fontFamily:"inherit",outline:"none",width:60};
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
